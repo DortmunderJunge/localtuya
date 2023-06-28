@@ -23,6 +23,7 @@ from .const import (
     CONF_POSITIONING_MODE,
     CONF_SET_POSITION_DP,
     CONF_SPAN_TIME,
+    CONF_TIME_UP_GAP_PERCENTAGE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,6 +57,9 @@ def flow_schema(dps):
         vol.Optional(CONF_SPAN_TIME, default=DEFAULT_SPAN_TIME): vol.All(
             vol.Coerce(float), vol.Range(min=1.0, max=300.0)
         ),
+        vol.Optional(CONF_TIME_UP_GAP_PERCENTAGE, default=0.0): vol.All(
+            vol.Coerce(float), vol.Range(min=0.0, max=100)
+        )
     }
 
 
@@ -126,12 +130,14 @@ class LocaltuyaCover(LocalTuyaEntity, CoverEntity):
             posdiff = abs(newpos - currpos)
             mydelay = posdiff / 100.0 * self._config[CONF_SPAN_TIME]
             if newpos > currpos:
-                self.debug("Opening to %f: delay %f", newpos, mydelay)
+                opendelay = mydelay * (1 + self._config[CONF_TIME_UP_GAP_PERCENTAGE] / 100)
+                self.debug("Opening to %f: delay %f", newpos, opendelay)
                 await self.async_open_cover()
+                self.hass.async_create_task(self.async_stop_after_timeout(opendelay))
             else:
                 self.debug("Closing to %f: delay %f", newpos, mydelay)
                 await self.async_close_cover()
-            self.hass.async_create_task(self.async_stop_after_timeout(mydelay))
+                self.hass.async_create_task(self.async_stop_after_timeout(mydelay))
             self.debug("Done")
 
         elif self._config[CONF_POSITIONING_MODE] == COVER_MODE_POSITION:
