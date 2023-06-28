@@ -63,6 +63,7 @@
                     "set_position_dp": "Set Position (for *position* mode only)",
                     "position_inverted": "Invert 0-100 position (for *position* mode only)",
                     "span_time": "Full opening time, in secs. (for *timed* mode only)",
+                    "time_up_gap_percentage": "Additional percentage of opening time compared to closing time. (for *timed* mode only)",
                     "unit_of_measurement": "Unit of Measurement",
                     "device_class": "Device Class",
                     "scaling": "Scaling Factor",
