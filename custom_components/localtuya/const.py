@@ -69,8 +69,8 @@ CONF_POSITIONING_MODE = "positioning_mode"
 CONF_CURRENT_POSITION_DP = "current_position_dp"
 CONF_SET_POSITION_DP = "set_position_dp"
 CONF_POSITION_INVERTED = "position_inverted"
-CONF_SPAN_TIME = "span_time"
-CONF_TIME_UP_GAP_PERCENTAGE = "time_up_gap_percentage"
+CONF_SPAN_TIME_OPEN = "span_time_open"
+CONF_SPAN_TIME_CLOSE = "span_time_close"
 
 # fan
 CONF_FAN_SPEED_CONTROL = "fan_speed_control"

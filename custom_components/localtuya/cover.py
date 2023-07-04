@@ -22,8 +22,8 @@ from .const import (
     CONF_POSITION_INVERTED,
     CONF_POSITIONING_MODE,
     CONF_SET_POSITION_DP,
-    CONF_SPAN_TIME,
-    CONF_TIME_UP_GAP_PERCENTAGE,
+    CONF_SPAN_TIME_OPEN,
+    CONF_SPAN_TIME_CLOSE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -54,11 +54,11 @@ def flow_schema(dps):
         vol.Optional(CONF_CURRENT_POSITION_DP): vol.In(dps),
         vol.Optional(CONF_SET_POSITION_DP): vol.In(dps),
         vol.Optional(CONF_POSITION_INVERTED, default=False): bool,
-        vol.Optional(CONF_SPAN_TIME, default=DEFAULT_SPAN_TIME): vol.All(
+        vol.Optional(CONF_SPAN_TIME_OPEN, default=DEFAULT_SPAN_TIME): vol.All(
             vol.Coerce(float), vol.Range(min=1.0, max=300.0)
         ),
-        vol.Optional(CONF_TIME_UP_GAP_PERCENTAGE, default=0.0): vol.All(
-            vol.Coerce(float), vol.Range(min=0.0, max=100)
+        vol.Optional(CONF_SPAN_TIME_CLOSE, default=DEFAULT_SPAN_TIME): vol.All(
+            vol.Coerce(float), vol.Range(min=1.0, max=300.0)
         )
     }
 
@@ -128,16 +128,16 @@ class LocaltuyaCover(LocalTuyaEntity, CoverEntity):
 
             currpos = self.current_cover_position
             posdiff = abs(newpos - currpos)
-            mydelay = posdiff / 100.0 * self._config[CONF_SPAN_TIME]
             if newpos > currpos:
-                opendelay = mydelay * (1 + self._config[CONF_TIME_UP_GAP_PERCENTAGE] / 100)
+                opendelay = posdiff / 100.0 * self._config[CONF_SPAN_TIME_OPEN]
                 self.debug("Opening to %f: delay %f", newpos, opendelay)
                 await self.async_open_cover()
                 self.hass.async_create_task(self.async_stop_after_timeout(opendelay))
             else:
-                self.debug("Closing to %f: delay %f", newpos, mydelay)
+                closedelay = posdiff / 100.0 * self._config[CONF_SPAN_TIME_CLOSE]
+                self.debug("Closing to %f: delay %f", newpos, closedelay)
                 await self.async_close_cover()
-                self.hass.async_create_task(self.async_stop_after_timeout(mydelay))
+                self.hass.async_create_task(self.async_stop_after_timeout(closedelay))
             self.debug("Done")
 
         elif self._config[CONF_POSITIONING_MODE] == COVER_MODE_POSITION:
@@ -164,7 +164,7 @@ class LocaltuyaCover(LocalTuyaEntity, CoverEntity):
             # instead of waiting the internal timeout
             self.hass.async_create_task(
                 self.async_stop_after_timeout(
-                    self._config[CONF_SPAN_TIME] + COVER_TIMEOUT_TOLERANCE
+                    self._config[CONF_SPAN_TIME_OPEN] + COVER_TIMEOUT_TOLERANCE
                 )
             )
 
@@ -173,11 +173,11 @@ class LocaltuyaCover(LocalTuyaEntity, CoverEntity):
         self.debug("Launching command %s to cover ", self._close_cmd)
         await self._device.set_dp(self._close_cmd, self._dp_id)
         if self._config[CONF_POSITIONING_MODE] == COVER_MODE_TIMED:
-            # for timed positioning, stop the cover after a full opening timespan
+            # for timed positioning, stop the cover after a full closing timespan
             # instead of waiting the internal timeout
             self.hass.async_create_task(
                 self.async_stop_after_timeout(
-                    self._config[CONF_SPAN_TIME] + COVER_TIMEOUT_TOLERANCE
+                    self._config[CONF_SPAN_TIME_CLOSE] + COVER_TIMEOUT_TOLERANCE
                 )
             )
 
@@ -216,9 +216,11 @@ class LocaltuyaCover(LocalTuyaEntity, CoverEntity):
             if self._previous_state != self._stop_cmd:
                 # the state has changed, and the cover was moving
                 time_diff = time.time() - self._timer_start
-                pos_diff = round(time_diff / self._config[CONF_SPAN_TIME] * 100.0)
+                pos_diff = 0
                 if self._previous_state == self._close_cmd:
-                    pos_diff = -pos_diff
+                    pos_diff = -round(time_diff / self._config[CONF_SPAN_TIME_CLOSE] * 100.0)
+                if self._previous_state == self._open_cmd:
+                    pos_diff = round(time_diff / self._config[CONF_SPAN_TIME_OPEN] * 100.0)    
                 self._current_cover_position = min(
                     100, max(0, self._current_cover_position + pos_diff)
                 )
